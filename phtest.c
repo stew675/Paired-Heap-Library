@@ -42,318 +42,400 @@ test_time(int t)
 
 
 void
-test1(int count)
+test1(intptr_t count)
 {
-	void *oph;
-	void *data;
-	struct heap *root = NULL, *s;
-	int i;
-	uint64_t ex, lex;
+	void *heap, *data;
+	intptr_t i, ex, lex;
 
 	fprintf(stderr, "TEST 1 - SORTING\n");
+
+	// Setup phase
 	test_time(TIME_START);
-
-	oph = pheap_create(NULL);
-	for(i = 0; i < count; i++) {
-		ex = (uint64_t)random();
-		pheap_insert(oph, (void *)ex, (void *)ex);
-	}
-
-	test_time(TIME_SETUP);
-
-	ex = 0;
-	lex = 0;
-	if((data = pheap_del_min(oph)))
-		lex = (uint64_t)data;
-	while((data = pheap_del_min(oph))) {
-		ex = (uint64_t)data;
-		if(ex < lex)
-			break;
-		lex = ex;
-	}
-
-	test_time(TIME_DONE);
-
-	if(ex < lex) {
-		fprintf(stderr, "Test 1 FAILED - Sort out of order\n");
-	} else {
-		fprintf(stderr, "Test 1 PASSED - Sort is in order\n");
-	}
-
-	// Cleanup
-	pheap_destroy(oph);
-} // test1
-
-
-void
-test2(int count)
-{
-	void *oph;
-	void *data;
-	struct heap *root = NULL, *s;
-	int i, pos, cnt;
-	uint64_t ex, lex;
-	void **t2nodes = NULL;
-	uint64_t *keys = NULL;
-
-	fprintf(stderr, "TEST 2 - DELETE IN PLACE\n");
-
-	test_time(TIME_START);
-	t2nodes = (void **)calloc(sizeof(void *), count);
-	if(t2nodes == NULL) {
+	if((heap = pheap_create(NULL)) == NULL) {
 		fprintf(stderr, "Test 2 FAILED - Out of memory\n");
 		test_time(TIME_SETUP);
 		test_time(TIME_DONE);
-		return;
+		goto t1cleanup;
 	}
-
-	keys = (uint64_t *)calloc(sizeof(uint64_t), count);
-	if(keys == NULL) {
-		fprintf(stderr, "Test 2 FAILED - Out of memory\n");
-		test_time(TIME_SETUP);
-		test_time(TIME_DONE);
-		return;
+	for (i = 0; i < count; i++) {
+		ex = (intptr_t)random() % INTPTR_MAX;
+		pheap_insert(heap, (void *)ex, (void *)ex);
 	}
-
-	oph = pheap_create(NULL);
-
-	for(i = 0; i < count; i++) {
-		ex = (uint64_t)random();
-		keys[i] = ex;
-		t2nodes[i] = pheap_insert(oph, (void *)ex, (void *)ex);
-	}
-
-	fprintf(stderr, "Test 2 SETUP - Inserted %d nodes\n", i);
-
 	test_time(TIME_SETUP);
 
-	for(i = 0; i < count; i++) {
-		ex =  (uint64_t)pheap_del(oph, t2nodes[i]);
-//		fprintf(stderr, "ex = %llu, keys[i] = %llu\n", (unsigned long long)ex, (unsigned long long)keys[i]);
-		if(ex != keys[i])
-			break;
-	}
-	data = pheap_del_min(oph);
-
-	fprintf(stderr, "Test 2 DONE - Deleted %d nodes\n", i);
-
-	test_time(TIME_DONE);
-
-	if(i < count)
-		fprintf(stderr, "Test 2 FAILED - Mismatched keys after %d deletions\n", i);
-	else if(data)
-		fprintf(stderr, "Test 2 FAILED - Tree is not empty\n");
-	else
-		fprintf(stderr, "Test 2 PASSED\n");
-
-	// Cleanup
-	free(t2nodes);
-	free(keys);
-	pheap_destroy(oph);
-} // test2
-
-
-void
-test3(int count)
-{
-	void *oph;
-	void *data;
-	struct heap *root = NULL, *s;
-	int i, pos, cnt;
-	uint64_t ex, lex;
-	void **t3nodes = NULL;
-	uint64_t *keys = NULL;
-
-	fprintf(stderr, "TEST 3 - DECREASE(CHANGE) KEY and SORT\n");
-
-	test_time(TIME_START);
-	t3nodes = (void **)calloc(sizeof(void *), count);
-	if(t3nodes == NULL) {
-		fprintf(stderr, "Test 2 FAILED - Out of memory\n");
-		test_time(TIME_SETUP);
-		test_time(TIME_DONE);
-		return;
-	}
-
-	keys = (uint64_t *)calloc(sizeof(uint64_t), count);
-	if(keys == NULL) {
-		fprintf(stderr, "Test 2 FAILED - Out of memory\n");
-		test_time(TIME_SETUP);
-		test_time(TIME_DONE);
-		return;
-	}
-
-	oph = pheap_create(NULL);
-
-	for(i = 0; i < count; i++) {
-		ex = (uint64_t)random();
-		keys[i] = ex;
-		t3nodes[i] = pheap_insert(oph, (void *)ex, (void *)ex);
-	}
-
-	fprintf(stderr, "Test 3 SETUP - Inserted %d nodes\n", i);
-
-	test_time(TIME_SETUP);
-
-	// Now decrease all the keys
-	for(i = 0; i < count; i++) {
-		// Ensure it's a decrease key operation (not increasing)
-		ex = keys[i] - (random() % keys[i]);
-		keys[i] = ex;
-		t3nodes[i] = pheap_decrease_key(oph, t3nodes[i], (void *)ex);
-		pheap_set_data(t3nodes[i], (void *)ex);
-	}
-
-	fprintf(stderr, "Test 3 DONE - Changed Keys of %d nodes\n", i);
-	test_time(TIME_DONE);
-
-	if(i < count) {
-		fprintf(stderr, "Test 3 FAILED - Mismatched keys after %d deletions\n", i);
-		goto t3cleanup;
-	}
-
-	test_time(TIME_START);
-	fprintf(stderr, "Test 3 - Sorting AND Deleting\n");
-	test_time(TIME_SETUP);
-	// Now delete
-	ex = 0;
-	lex = 0;
-	i = 1;
-	if((data = pheap_del_min(oph)))
-		lex = (uint64_t)data;
-	while((data = pheap_del_min(oph))) {
-		ex = (uint64_t)data;
+	// Sorting phase
+	i = ex = lex = 0;
+	while (pheap_delete_min(heap, NULL, &data)) {
+		ex = (intptr_t)data;
 		if(ex < lex)
 			break;
 		lex = ex;
 		i++;
 	}
+	fprintf(stderr, "Test 1 DONE - Sorted %ld nodes\n", i);
 	test_time(TIME_DONE);
 
-	fprintf(stderr, "Test 3 DONE - Sorted and Deleted %d nodes\n", i);
+	// Validate
+	if (ex < lex) {
+		fprintf(stderr, "Test 1 FAILED - Sort out of order after %ld deletions\n", i);
+	} else if (pheap_delete_min(heap, NULL, &data)) {
+		fprintf(stderr, "Test 1 FAILED - Tree is not empty\n");
+	} else {
+		fprintf(stderr, "Test 1 PASSED - Sort is in order\n");
+	}
 
-	data = pheap_del_min(oph);
+t1cleanup:
+	// Cleanup
+	if (heap) {
+		pheap_destroy(heap, NULL);
+		heap = NULL;
+	}
+} // test1
 
+
+void
+test2(intptr_t count)
+{
+	void *heap, *data, **t2nodes = NULL;
+	intptr_t i, ex, lex, *keys = NULL;
+
+	fprintf(stderr, "TEST 2 - DELETE IN PLACE\n");
+
+	// Setup phase
+	test_time(TIME_START);
+	if ((t2nodes = (void **)calloc(count, sizeof(void *))) == NULL) {
+		fprintf(stderr, "Test 2 FAILED - Out of memory\n");
+		test_time(TIME_SETUP);
+		test_time(TIME_DONE);
+		goto t2cleanup;
+	}
+	if ((keys = (intptr_t *)calloc(count, sizeof(intptr_t))) == NULL) {
+		fprintf(stderr, "Test 2 FAILED - Out of memory\n");
+		test_time(TIME_SETUP);
+		test_time(TIME_DONE);
+		goto t2cleanup;
+	}
+	if ((heap = pheap_create(NULL)) == NULL) {
+		fprintf(stderr, "Test 2 FAILED - Out of memory\n");
+		test_time(TIME_SETUP);
+		test_time(TIME_DONE);
+		goto t2cleanup;
+	}
+	for(i = 0; i < count; i++) {
+		ex = (intptr_t)random() % INTPTR_MAX;
+		keys[i] = ex;
+		t2nodes[i] = pheap_insert(heap, (void *)ex, (void *)ex);
+	}
+	fprintf(stderr, "Test 2 SETUP - Inserted %ld nodes\n", i);
+	test_time(TIME_SETUP);
+
+	// Out of order deletion/validation phase
+	for(i = 0; i < count; i++) {
+		pheap_delete(heap, t2nodes[i], (void *)&ex, NULL);
+		if(ex != keys[i])
+			break;
+	}
+	fprintf(stderr, "Test 2 DONE - Deleted %ld nodes\n", i);
+	test_time(TIME_DONE);
+
+	// Validate
 	if(i < count)
-		fprintf(stderr, "Test 3 FAILED - Out of order after  %d deletions\n", i);
-	else if(data)
+		fprintf(stderr, "Test 2 FAILED - Mismatched keys after %ld deletions\n", i);
+	else if (pheap_delete_min(heap, NULL, &data))
+		fprintf(stderr, "Test 2 FAILED - Tree is not empty\n");
+	else
+		fprintf(stderr, "Test 2 PASSED\n");
+
+t2cleanup:
+	// Cleanup
+	if (t2nodes) {
+		free(t2nodes);
+	}
+	if (keys) {
+		free(keys);
+	}
+	if (heap) {
+		pheap_destroy(heap, NULL);
+		heap = NULL;
+	}
+} // test2
+
+
+void
+test3(intptr_t count)
+{
+	void *heap, *key, *data, **t3nodes = NULL;
+	intptr_t i, ex, lex, *keys = NULL;
+
+	fprintf(stderr, "TEST 3 - DECREASE(CHANGE) KEY and SORT\n");
+
+	// Setup Phase
+	test_time(TIME_START);
+	if((t3nodes = (void **)calloc(count, sizeof(void *))) == NULL) {
+		fprintf(stderr, "Test 2 FAILED - Out of memory\n");
+		test_time(TIME_SETUP);
+		test_time(TIME_DONE);
+		goto t3cleanup;
+	}
+	if((keys = (intptr_t *)calloc(count, sizeof(intptr_t))) == NULL) {
+		fprintf(stderr, "Test 2 FAILED - Out of memory\n");
+		test_time(TIME_SETUP);
+		test_time(TIME_DONE);
+		goto t3cleanup;
+	}
+	if((heap = pheap_create(NULL)) == NULL) {
+		fprintf(stderr, "Test 2 FAILED - Out of memory\n");
+		test_time(TIME_SETUP);
+		test_time(TIME_DONE);
+		goto t3cleanup;
+	}
+	for(i = 0; i < count; i++) {
+		ex = (intptr_t)random() % INTPTR_MAX;
+		keys[i] = ex;
+		t3nodes[i] = pheap_insert(heap, (void *)ex, (void *)ex);
+	}
+	fprintf(stderr, "Test 3 SETUP - Inserted %ld nodes\n", i);
+	test_time(TIME_SETUP);
+
+	// Now change all the keys
+	for(i = 0; i < count; i++) {
+		ex = random() % INTPTR_MAX;
+		keys[i] = ex;
+		pheap_change_key(heap, t3nodes[i], (void *)ex);
+		// Since we're using the data value to echo the key value
+		// to test sort/heap integrity, then update its value here
+		pheap_set_data(t3nodes[i], (void *)ex);
+	}
+	fprintf(stderr, "Test 3 DONE - Changed Keys of %ld nodes\n", i);
+	test_time(TIME_DONE);
+
+	// Validate
+	if(i < count) {
+		fprintf(stderr, "Test 3 FAILED - Mismatched keys after %ld deletions\n", i);
+		goto t3cleanup;
+	}
+
+	// Delete/sort validation phase
+	test_time(TIME_START);
+	fprintf(stderr, "Test 3 - Sorting AND Deleting\n");
+	test_time(TIME_SETUP);
+	ex = 0;
+	lex = 0;
+	i = 0;
+	while(pheap_delete_min(heap, &key, &data)) {
+		ex = (intptr_t)data;
+		if(ex < lex)
+			break;
+		lex = ex;
+		i++;
+	}
+	fprintf(stderr, "Test 3 DONE - Sorted and Deleted %ld nodes\n", i);
+	test_time(TIME_DONE);
+
+	// Validate
+	if(i < count)
+		fprintf(stderr, "Test 3 FAILED - Out of order after  %ld deletions\n", i);
+	else if (pheap_delete_min(heap, NULL, &data))
 		fprintf(stderr, "Test 3 FAILED - Tree is not empty\n");
 	else
 		fprintf(stderr, "Test 3 PASSED\n");
 
 	// Cleanup
 t3cleanup:
-	free(t3nodes);
-	free(keys);
-	pheap_destroy(oph);
+	if(t3nodes) {
+		free(t3nodes);
+		t3nodes = NULL;
+	}
+	if(keys) {
+		free(keys);
+		keys = NULL;
+	}
+	if (heap) {
+		pheap_destroy(heap, NULL);
+		heap = NULL;
+	}
 } // test3
 
 
 void
-test4(int count)
+test4(intptr_t count)
 {
-	void *oph;
-	void *data;
-	struct heap *root = NULL, *s;
-	int i, pos, cnt;
-	uint64_t ex, lex;
-	void **t4nodes = NULL;
-	uint64_t *keys = NULL;
+	void *heap = NULL, *data, **t4nodes = NULL;
+	intptr_t i, ex, lex, *keys = NULL;;
 
 	fprintf(stderr, "TEST 4 - INSERT + DEL_MIN\n");
 
 	test_time(TIME_START);
 
-	fprintf(stderr, "Setup: First inserting %d nodes\n", count);
+	fprintf(stderr, "Setup: First inserting %ld nodes\n", count);
 
-	t4nodes = (void **)calloc(sizeof(void *), count);
-	if(t4nodes == NULL) {
+	// Setup phase
+	if ((t4nodes = (void **)calloc(count, sizeof(void *))) == NULL) {
 		fprintf(stderr, "Test 2 FAILED - Out of memory\n");
 		test_time(TIME_SETUP);
 		test_time(TIME_DONE);
-		return;
+		goto t4cleanup;
 	}
-
-	keys = (uint64_t *)calloc(sizeof(uint64_t), count);
-	if(keys == NULL) {
-		fprintf(stderr, "Test 2 FAILED - Out of memory\n");
+	if((keys = (intptr_t *)calloc(count, sizeof(intptr_t))) == NULL) {
+		fprintf(stderr, "Test 4 FAILED - Out of memory\n");
 		test_time(TIME_SETUP);
 		test_time(TIME_DONE);
-		return;
+		goto t4cleanup;
 	}
-
-	oph = pheap_create(NULL);
-
+	if((heap = pheap_create(NULL)) == NULL) {
+		fprintf(stderr, "Test 4 FAILED - Unable to acquire a heap\n");
+		test_time(TIME_SETUP);
+		test_time(TIME_DONE);
+		goto t4cleanup;
+	}
 	for(i = 0; i < count; i++) {
-		ex = (uint64_t)random();
+		ex = (intptr_t)random() % INTPTR_MAX;
 		keys[i] = ex;
-		t4nodes[i] = pheap_insert(oph, (void *)ex, (void *)ex);
+		t4nodes[i] = pheap_insert(heap, (void *)ex, (void *)ex);
 	}
-
-	fprintf(stderr, "Test 4 SETUP - Inserted %d nodes\n", i);
-
+	fprintf(stderr, "Test 4 SETUP - Inserted %ld nodes\n", i);
 	test_time(TIME_SETUP);
 
 	// Issue a del_min followed by an insert count times
-
-	fprintf(stderr, "Run: Now issuing a del_min followed by an insert %d times\n", count);
-	// Now Change all the keys
+	fprintf(stderr, "Run: Now issuing a del_min followed by an insert %ld times\n", count);
 	for(i = 0; i < count; i++) {
-		data = pheap_del_min(oph);
-		ex = (uint64_t)random();
+		pheap_delete_min(heap, NULL, NULL);
+		ex = (intptr_t)random() % INTPTR_MAX;
 		keys[i] = ex;
-		t4nodes[i] = pheap_insert(oph, (void *)ex, (void *)ex);
+		t4nodes[i] = pheap_insert(heap, (void *)ex, (void *)ex);
 	}
-
-	fprintf(stderr, "Test 4 DONE - Ran del_min + random insert %d times\n", i);
+	fprintf(stderr, "Test 4 DONE - Ran del_min + random insert %ld times\n", i);
 	test_time(TIME_DONE);
 
+	// Delete/sort validation
 	test_time(TIME_START);
 	fprintf(stderr, "Test 4 - Now Sorting and Deleting\n");
 	test_time(TIME_SETUP);
-	// Now delete
-	ex = 0;
-	lex = 0;
-	i = 1;
-	if((data = pheap_del_min(oph)))
-		lex = (uint64_t)data;
-	while((data = pheap_del_min(oph))) {
-		ex = (uint64_t)data;
+	i = ex = lex = 0;
+	while(pheap_delete_min(heap, NULL, &data)) {
+		ex = (intptr_t)data;
 		if(ex < lex)
 			break;
 		lex = ex;
 		i++;
 	}
+	fprintf(stderr, "Test 4 DONE - Sorted and Deleted %ld nodes\n", i);
 	test_time(TIME_DONE);
 
-	fprintf(stderr, "Test 4 DONE - Sorted and Deleted %d nodes\n", i);
-
-	data = pheap_del_min(oph);
-
+	// Validate
 	if(i < count)
-		fprintf(stderr, "Test 4 FAILED - Out of order after  %d deletions\n", i);
-	else if(data)
+		fprintf(stderr, "Test 4 FAILED - Out of order after  %ld deletions\n", i);
+	else if (pheap_delete_min(heap, NULL, NULL))
 		fprintf(stderr, "Test 4 FAILED - Tree is not empty\n");
 	else
 		fprintf(stderr, "Test 4 PASSED\n");
 
 	// Cleanup
 t4cleanup:
-	free(t4nodes);
-	free(keys);
-	pheap_destroy(oph);
-} // test3
+	if (t4nodes) {
+		free(t4nodes);
+		t4nodes = NULL;
+	}
+	if (keys) {
+		free(keys);
+		keys = NULL;
+	}
+	if (heap) {
+		pheap_destroy(heap, NULL);
+		heap = NULL;
+	}
+} // test4
+
+
+void
+test5(intptr_t count)
+{
+	void *heap = NULL, **t5nodes = NULL;
+	intptr_t i, ex, lex, *keys = NULL;
+
+	fprintf(stderr, "TEST 5 - FULL HEAP DESTROY\n");
+
+	test_time(TIME_START);
+
+	fprintf(stderr, "Setup: First inserting %ld nodes\n", count);
+
+	t5nodes = (void **)calloc(count, sizeof(void *));
+	if(t5nodes == NULL) {
+		fprintf(stderr, "Test 2 FAILED - Out of memory\n");
+		test_time(TIME_SETUP);
+		test_time(TIME_DONE);
+		goto t5cleanup;
+	}
+
+	keys = (intptr_t *)calloc(count, sizeof(intptr_t));
+	if(keys == NULL) {
+		fprintf(stderr, "Test 2 FAILED - Out of memory\n");
+		test_time(TIME_SETUP);
+		test_time(TIME_DONE);
+		goto t5cleanup;
+	}
+
+	heap = pheap_create(NULL);
+
+	for(i = 0; i < count; i++) {
+		ex = (intptr_t)random() % INTPTR_MAX;
+		keys[i] = ex;
+		t5nodes[i] = pheap_insert(heap, (void *)ex, (void *)ex);
+	}
+
+	fprintf(stderr, "Test 5 SETUP - Inserted %ld nodes\n", i);
+
+	// Issue a del_min followed by an insert count times
+
+	fprintf(stderr, "Run: Now issuing a del_min followed by an insert %ld times\n", count);
+	// Now Change all the keys
+	for(i = 0; i < count; i++) {
+		pheap_delete_min(heap, NULL, NULL);
+		ex = (intptr_t)random() % INTPTR_MAX;
+		keys[i] = ex;
+		t5nodes[i] = pheap_insert(heap, (void *)ex, (void *)ex);
+	}
+
+	fprintf(stderr, "Test 5 SETUP - Ran del_min + random insert %ld times\n", i);
+	test_time(TIME_SETUP);
+
+	fprintf(stderr, "Test 5 RUN - Destroying heap of %ld nodes\n", i);
+
+	pheap_destroy(heap, NULL);
+	heap = NULL;
+
+	test_time(TIME_DONE);
+
+	fprintf(stderr, "Test 5 DONE - Destroyed Heap with %ld nodes\n", i);
+
+	fprintf(stderr, "Test 5 PASSED\n");
+
+	// Cleanup
+t5cleanup:
+	if (t5nodes) {
+		free(t5nodes);
+		t5nodes = NULL;
+	}
+	if (keys) {
+		free(keys);
+		keys = NULL;
+	}
+	if (heap) {
+		pheap_destroy(heap, NULL);
+		heap = NULL;
+	}
+} // test5
 
 
 int
 main(int argc, char *argv[])
 {
-	int count;
+	intptr_t count;
 	if(argc != 2) {
 		fprintf(stderr, "Usage: %s count\n", argv[0]);
 		return 0;
 	}
-	count = atoi(argv[1]);
+	count = (intptr_t)atoi(argv[1]);
 	if(count < 1) {
 		fprintf(stderr, "%s: count must be an integer of 1 or greater\n", argv[0]);
 		return 0;
@@ -366,4 +448,6 @@ main(int argc, char *argv[])
 	test3(count);
 	fprintf(stderr, "\n");
 	test4(count);
+	fprintf(stderr, "\n");
+	test5(count);
 } // main
